@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+	<title>播放器</title>
+<!--    <script src="./vconsole.js"></script>-->
+    <script src="./jessibuca.js"></script>
+    <link rel="stylesheet" href="./demo.css">
+    <style>
+        .container-shell:before {
+            content: "";
+        }
+    </style>
+</head>
+<body class="page">
+<div class="root">
+    <div class="container-shell">
+        <div id="container"></div>
+    </div>
+</div>
+<script src="./demo.js"></script>
+<script src="./uni.webview.1.5.5.js"></script>
+<script>
+    var $container = document.getElementById('container');
+    var showOperateBtns = true; // 是否显示按钮
+    var forceNoOffscreen = true; //
+    var jessibuca = null;
+
+	function getQuery(name) {
+		let reg = new RegExp("(^|&)" + name + "=([^&]*)(&|$)");
+		let r = window.location.search.substr(1).match(reg);
+		if (r != null) {
+			return decodeURIComponent(r[2]);
+		}
+		return null;
+	}
+	var data = JSON.parse(getQuery('data'));
+    var type = null;
+    var playTimes = null;
+	var playUrl = null;
+	var $decoderUrl = null;
+	if (data != null) {
+        type = data.type;
+        playUrl = data.playUrl;
+		$decoderUrl = data.decoderUrl;
+		console.log($decoderUrl);
+        playurl();
+	}
+
+	function create() {
+        var isHls = false;
+        let suffix = "hls.m3u8";
+        if (playUrl.endsWith(suffix)) {
+            isHls = true;
+        }
+        jessibuca = new Jessibuca({
+            container: $container,
+            videoBuffer: 0.2, // 缓存时长
+            decoder: $decoderUrl +'js/jessibuca/decoder.js',
+            isResize: false,
+            isHls: isHls,
+            useWCS: false,
+            useMSE: false,
+            useSIMD: true,
+            text: "",
+            loadingText: "加载中",
+            debug: true,
+			debugLevel: 'debug',
+            showBandwidth: showOperateBtns, // 显示网速
+            operateBtns: {
+                fullscreen: showOperateBtns,
+                screenshot: showOperateBtns,
+                play: showOperateBtns,
+                audio: showOperateBtns,
+            },
+            forceNoOffscreen: forceNoOffscreen,
+            isNotMute: false,
+        },);
+        jessibuca.on('error', function(error) {
+            console.log('error')
+            console.log(error)
+        })
+        jessibuca.onLog = msg => console.error(msg);
+        jessibuca.onRecord = (status) => console.log('onRecord', status);
+        jessibuca.onPause = () => console.log('onPause');
+        jessibuca.onPlay = () => console.log('onPlay');
+        jessibuca.onFullscreen = msg => console.log('onFullscreen', msg);
+        jessibuca.onMute = msg => console.log('onMute', msg);
+    }
+
+    function playurl() {
+        create();
+        if (type == "play") {
+            console.log(playUrl);
+            play(playUrl);
+        } else if (type == "playback") {
+            playTimes = data.playTimes;
+            console.log(playTimes);
+            playback(playUrl, playTimes);
+        }
+    }
+
+    function seekPlay(timeObj) {
+        uni.postMessage({
+            data: {
+                action: 'seekPlay',
+                msg: timeObj
+            }
+        });
+    }
+    function replay() {
+        if (jessibuca) {
+            jessibuca.destroy().then(()=>{
+                startPlay();
+            });
+        } else {
+            startPlay();
+        }
+    }
+
+    function play(url) {
+        if (url) {
+            jessibuca.play(url);
+        }
+    }
+
+    function playback(url, times) {
+        if (url) {
+            jessibuca.playback(url, {
+                playList: times,
+                fps: 20, //FPS（定频(本地设置)生效）
+                showControl: true,
+                showRateBtn: true,
+                isUseFpsRender: true, // 是否使用固定的fps渲染，如果设置的fps小于流推过来的，会造成内存堆积甚至溢出
+                isCacheBeforeDecodeForFpsRender: false, // rfs渲染时，是否在解码前缓存数据
+                supportWheel: true, // 是否支持滚动轴切换精度。
+                rateConfig: [
+                    { label: '正常', value: 1 },
+                    { label: '2倍', value: 2 },
+                    { label: '4倍', value: 4 },
+                    { label: '8倍', value: 8 },
+                ],
+            })
+        }
+    }
+
+    window.οnbefοreunlοad = function () {
+        alert("===οnbefοreunlοad===");
+        if(event.clientX>document.body.clientWidth && event.clientY < 0 || event.altKey){
+            alert("你关闭了浏览器");
+            jessibuca.destroy();
+        } else {
+            alert("你正在刷新页面");
+            replay();
+        }
+    }
+
+</script>
+
+</body>
+</html>
